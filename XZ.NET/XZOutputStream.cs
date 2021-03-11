@@ -85,7 +85,7 @@ namespace XZ.NET
 
         public override void Flush()
         {
-            throw new NotSupportedException();
+            Debug.WriteLine("XZ Stream does not support flush");
         }
 
         public override long Seek(long offset, SeekOrigin origin)
@@ -95,7 +95,7 @@ namespace XZ.NET
 
         public override void SetLength(long value)
         {
-            throw new NotSupportedException();
+            Debug.WriteLine($"NotSupportedException: {new StackTrace()}");
         }
 
         public override int Read(byte[] buffer, int offset, int count)

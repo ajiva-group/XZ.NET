@@ -23,6 +23,7 @@
 */
 
 using System;
+using System.Diagnostics;
 using System.IO;
 
 namespace XZ.NET
@@ -42,9 +43,10 @@ namespace XZ.NET
         private const int LzmaConcatenatedFlag = 0x08;
 
         public XZInputStream(Stream s) : this(s, false) { }
+
         public XZInputStream(Stream s, bool leaveOpen) : this()
         {
-            if(s == null) throw new ArgumentNullException();
+            if (s == null) throw new ArgumentNullException();
             _mInnerStream = s;
             this.leaveOpen = leaveOpen;
             _inbuf = new byte[BufSize];
@@ -68,9 +70,10 @@ namespace XZ.NET
         }
 
         #region Overrides
+
         public override void Flush()
         {
-            throw new NotSupportedException("XZ Stream does not support flush");
+            Debug.WriteLine("XZ Stream does not support flush");
         }
 
         public override long Seek(long offset, SeekOrigin origin)
@@ -89,7 +92,7 @@ namespace XZ.NET
         /// <returns>Number of bytes read or 0 on end of stream</returns>
         public override int Read(byte[] buffer, int offset, int count)
         {
-            if(count == 0) return 0;
+            if (count == 0) return 0;
             var guard = buffer[checked((uint)offset + (uint)count) - 1];
 
             var action = LzmaAction.LzmaRun;
@@ -99,10 +102,10 @@ namespace XZ.NET
                 if (_lzmaStream.avail_in == UIntPtr.Zero)
                 {
                     var read = _mInnerStream?.Read(_inbuf, 0, BufSize) ?? 0;
-                    if((uint)read > BufSize) throw new InvalidDataException();
+                    if ((uint)read > BufSize) throw new InvalidDataException();
                     _lzmaStream.avail_in = (UIntPtr)read;
                     _inbufOffset = 0;
-                    if(read == 0)
+                    if (read == 0)
                         action = LzmaAction.LzmaFinish;
                 }
 
@@ -118,14 +121,14 @@ namespace XZ.NET
                     }
                     _inbufOffset += (int)(_lzmaStream.next_in - inbuf);
                 }
-                if(ret > LzmaReturn.LzmaStreamEnd) throw ThrowError(ret);
+                if (ret > LzmaReturn.LzmaStreamEnd) throw ThrowError(ret);
 
                 var c = count - (int)(ulong)_lzmaStream.avail_out;
                 readCount += c;
-                if(ret == LzmaReturn.LzmaStreamEnd) break;
+                if (ret == LzmaReturn.LzmaStreamEnd) break;
                 offset += c;
                 count -= c;
-            } while(count != 0);
+            } while (count != 0);
             return readCount;
         }
 
@@ -137,7 +140,7 @@ namespace XZ.NET
 
         static Exception GetDecodingError(LzmaReturn ret)
         {
-            switch(ret)
+            switch (ret)
             {
                 case LzmaReturn.LzmaMemError: return new InsufficientMemoryException("Memory allocation failed");
                 case LzmaReturn.LzmaFormatError: return new InvalidDataException("The input is not in the .xz format");
@@ -180,18 +183,18 @@ namespace XZ.NET
                 if (_length == 0)
                 {
                     var str = _mInnerStream;
-                    if(str != null)
+                    if (str != null)
                     {
                         var buf = new byte[streamFooterSize];
 
                         str.Seek(-streamFooterSize, SeekOrigin.End);
-                        if(str.Read(buf, 0, streamFooterSize) != streamFooterSize) throw new InvalidDataException();
+                        if (str.Read(buf, 0, streamFooterSize) != streamFooterSize) throw new InvalidDataException();
 
                         var len = GetIndexSize(ref buf[0]);
-                        if(len != streamFooterSize) buf = new byte[len];
+                        if (len != streamFooterSize) buf = new byte[len];
 
                         str.Seek(-streamFooterSize - buf.Length, SeekOrigin.End);
-                        if(str.Read(buf, 0, buf.Length) != buf.Length) throw new InvalidDataException();
+                        if (str.Read(buf, 0, buf.Length) != buf.Length) throw new InvalidDataException();
                         str.Seek(0, SeekOrigin.Begin);
                         _length = GetUncompressedSize(buf, UIntPtr.Zero);
                     }
@@ -206,7 +209,7 @@ namespace XZ.NET
             LzmaStreamFlags lzmaStreamFlags;
             LzmaReturn ret;
             fixed (byte* inp = &footer) ret = Native.lzma_stream_footer_decode(&lzmaStreamFlags, inp);
-            if(ret != LzmaReturn.LzmaOK) throw IndexDecodingError(ret);
+            if (ret != LzmaReturn.LzmaOK) throw IndexDecodingError(ret);
             return lzmaStreamFlags.backwardSize;
         }
 
@@ -222,7 +225,7 @@ namespace XZ.NET
             var memLimit = UInt64.MaxValue;
 
             var ret = Native.lzma_index_buffer_decode(&index, &memLimit, null, buf, &inPos, (UIntPtr)buf.Length);
-            if(ret != LzmaReturn.LzmaOK) throw IndexDecodingError(ret);
+            if (ret != LzmaReturn.LzmaOK) throw IndexDecodingError(ret);
 
             var uSize = Native.lzma_index_uncompressed_size(index);
             Native.lzma_index_end(index, null);
@@ -241,7 +244,7 @@ namespace XZ.NET
             var memLimit = UInt64.MaxValue;
             UIntPtr inPos, outPos;
             var ret = Native.lzma_stream_buffer_decode(&memLimit, LzmaConcatenatedFlag, null, buffer, &inPos, (UIntPtr)buffer.Length, res, &outPos, (UIntPtr)res.Length);
-            if(ret != LzmaReturn.LzmaOK) throw GetDecodingError(ret);
+            if (ret != LzmaReturn.LzmaOK) throw GetDecodingError(ret);
             return res;
         }
 
@@ -257,7 +260,7 @@ namespace XZ.NET
         {
             Native.lzma_end(ref _lzmaStream);
 
-            if(disposing && !leaveOpen) _mInnerStream?.Close();
+            if (disposing && !leaveOpen) _mInnerStream?.Close();
 
             base.Dispose(disposing);
         }
